@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase 連線賓果</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
+        .cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: 1px solid #ccc; cursor: pointer; }
+        .cell.marked { background-color: #f87171; color: white; }
+        .cell.called { border: 3px solid #ef4444; font-weight: bold; }
+    </style>
+</head>
+<body class="bg-gray-100 p-4">
+
+    <div id="app" class="max-w-xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold text-center mb-4">🔥 Firebase Bingo</h1>
+        
+        <div id="login-section" class="text-center">
+            <button id="btn-login" class="bg-blue-500 text-white px-6 py-2 rounded">使用 Google 登入</button>
+        </div>
+
+        <div id="lobby-section" class="hidden">
+            <div id="user-info" class="mb-4 text-sm text-gray-600"></div>
+            <div class="grid grid-cols-2 gap-2 mb-4">
+                <button id="btn-create" class="bg-green-500 text-white p-2 rounded">創建房間</button>
+                <button id="btn-random" class="bg-purple-500 text-white p-2 rounded">隨機配對</button>
+            </div>
+            <div class="flex gap-2">
+                <input id="input-room-id" type="text" placeholder="輸入 8 位代碼" class="border p-2 flex-grow rounded">
+                <button id="btn-join" class="bg-gray-800 text-white px-4 rounded">加入</button>
+            </div>
+        </div>
+
+        <div id="room-section" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold">房間：<span id="display-room-id"></span></h2>
+                <button id="btn-leave" class="text-red-500 text-sm">離開房間</button>
+            </div>
+
+            <div id="host-controls" class="hidden bg-yellow-50 p-3 rounded mb-4 text-sm">
+                <p class="font-bold mb-2">房主控制面板</p>
+                連線目標：<select id="select-goal" class="border mr-2"><option value="3">3 條線</option><option value="5">5 條線</option></select>
+                <button id="btn-start" class="bg-orange-500 text-white px-3 py-1 rounded">開始遊戲</button>
+            </div>
+
+            <div id="player-list" class="mb-4 border-b pb-2"></div>
+            
+            <div id="game-board" class="bingo-grid mb-4"></div>
+            <div id="game-status" class="text-center font-bold text-red-600"></div>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, set, get, onValue, update, remove, push, runTransaction } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBdt75NPrgmYs0rw1KQv_sRfYdFwQimo1c",
+        authDomain: "bingo-f3e9d.firebaseapp.com",
+        projectId: "bingo-f3e9d",
+        storageBucket: "bingo-f3e9d.firebasestorage.app",
+        messagingSenderId: "952702149326",
+        appId: "1:952702149326:web:883681422e33337b26669f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+    const provider = new GoogleAuthProvider();
+
+    let currentUser = null;
+    let currentRoomId = null;
+    let myBoard = [];
+    let myMarked = Array(25).fill(false);
+
+    // --- UI 切換 ---
+    function showSection(id) {
+        ['login-section', 'lobby-section', 'room-section'].forEach(s => {
+            document.getElementById(s).classList.toggle('hidden', s !== id);
+        });
+    }
+
+    // --- 登入邏輯 ---
+    document.getElementById('btn-login').onclick = () => signInWithPopup(auth, provider);
+    
+    onAuthStateChanged(auth, user => {
+        if (user) {
+            currentUser = user;
+            document.getElementById('user-info').innerText = `登入身份：${user.displayName}`;
+            showSection('lobby-section');
+        } else {
+            showSection('login-section');
+        }
+    });
+
+    // --- 房間邏輯 ---
+    async function createRoom(isPublic = false) {
+        const roomId = Math.random().toString().slice(2, 10);
+        const roomRef = ref(db, `rooms/${roomId}`);
+        const initialData = {
+            host: currentUser.uid,
+            status: 'waiting',
+            isPublic: isPublic,
+            settings: { goal: 3, maxPlayers: 10 },
+            calledNumbers: [0], // 佔位
+            players: {
+                [currentUser.uid]: { name: currentUser.displayName, photo: currentUser.photoURL, ready: true }
+            }
+        };
+        await set(roomRef, initialData);
+        joinRoom(roomId);
+    }
+
+    async function joinRoom(roomId) {
+        const roomRef = ref(db, `rooms/${roomId}`);
+        const snapshot = await get(roomRef);
+        if (!snapshot.exists()) return alert("房間不存在");
+        
+        const roomData = snapshot.val();
+        if (Object.keys(roomData.players || {}).length >= 10) return alert("房間已滿");
+
+        await update(ref(db, `rooms/${roomId}/players/${currentUser.uid}`), {
+            name: currentUser.displayName,
+            photo: currentUser.photoURL,
+            ready: true
+        });
+
+        currentRoomId = roomId;
+        showSection('room-section');
+        document.getElementById('display-room-id').innerText = roomId;
+        initGame(roomId);
+    }
+
+    // --- 隨機配對 ---
+    document.getElementById('btn-random').onclick = async () => {
+        const roomsRef = ref(db, 'rooms');
+        const snapshot = await get(roomsRef);
+        let found = false;
+        snapshot.forEach(child => {
+            const room = child.val();
+            if (room.isPublic && room.status === 'waiting' && Object.keys(room.players).length < 10) {
+                joinRoom(child.key);
+                found = true;
+                return true;
+            }
+        });
+        if (!found) createRoom(true);
+    };
+
+    document.getElementById('btn-create').onclick = () => createRoom(false);
+    document.getElementById('btn-join').onclick = () => joinRoom(document.getElementById('input-room-id').value);
+
+    // --- 遊戲核心 ---
+    function initGame(roomId) {
+        const roomRef = ref(db, `rooms/${roomId}`);
+        
+        onValue(roomRef, (snapshot) => {
+            const data = snapshot.val();
+            if (!data) { // 被踢出或房間解散
+                currentRoomId = null;
+                showSection('lobby-section');
+                return;
+            }
+
+            // 檢查自己是否還在房間 (處理踢人)
+            if (!data.players[currentUser.uid]) {
+                alert("你已被移出房間");
+                location.reload();
+                return;
+            }
+
+            const isHost = data.host === currentUser.uid;
+            document.getElementById('host-controls').classList.toggle('hidden', !isHost);
+            
+            // 渲染玩家列表
+            const pList = document.getElementById('player-list');
+            pList.innerHTML = Object.entries(data.players).map(([uid, p]) => `
+                <div class="flex justify-between items-center py-1">
+                    <span>${p.name} ${uid === data.host ? '👑' : ''}</span>
+                    ${isHost && uid !== currentUser.uid ? `<button class="text-xs bg-red-100 px-1" onclick="kickPlayer('${uid}')">踢除</button>` : ''}
+                </div>
+            `).join('');
+
+            // 遊戲開始處理
+            if (data.status === 'playing' && myBoard.length === 0) {
+                generateBoard();
+                renderBoard(data.calledNumbers);
+            } else if (data.status === 'playing') {
+                renderBoard(data.calledNumbers);
+                checkWin(data.settings.goal);
+            }
+        });
+    }
+
+    // 踢人功能掛載到 window
+    window.kickPlayer = (uid) => {
+        remove(ref(db, `rooms/${currentRoomId}/players/${uid}`));
+    };
+
+    function generateBoard() {
+        let nums = Array.from({length: 25}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+        myBoard = nums;
+    }
+
+    function renderBoard(calledNumbers) {
+        const container = document.getElementById('game-board');
+        container.innerHTML = '';
+        myBoard.forEach((num, idx) => {
+            const div = document.createElement('div');
+            const isCalled = calledNumbers.includes(num);
+            div.className = `cell ${myMarked[idx] ? 'marked' : ''} ${isCalled ? 'called' : ''}`;
+            div.innerText = num;
+            div.onclick = () => {
+                if (isCalled) {
+                    myMarked[idx] = !myMarked[idx];
+                    renderBoard(calledNumbers);
+                } else {
+                    // 若規則允許點擊同步，可在這裡實作 update(calledNumbers)
+                    update(ref(db, `rooms/${currentRoomId}`), {
+                        calledNumbers: [...calledNumbers, num]
+                    });
+                }
+            };
+            container.appendChild(div);
+        });
+    }
+
+    function checkWin(goal) {
+        let lines = 0;
+        // 這裡實作簡單的連線檢查邏輯... (略，建議依需求增加)
+        if (lines >= goal) document.getElementById('game-status').innerText = "BINGO! 你贏了！";
+    }
+
+    document.getElementById('btn-start').onclick = () => {
+        update(ref(db, `rooms/${currentRoomId}`), { 
+            status: 'playing',
+            'settings/goal': document.getElementById('select-goal').value 
+        });
+    };
+
+    document.getElementById('btn-leave').onclick = () => {
+        remove(ref(db, `rooms/${currentRoomId}/players/${currentUser.uid}`));
+        location.reload();
+    };
+
+</script>
+</body>
+</html>
