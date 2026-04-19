@@ -3,101 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Firebase Pro Bingo</title>
+    <title>Bingo</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
-        .cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border: 2px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1.2rem; transition: all 0.2s; }
-        .cell:hover { background-color: #f1f5f9; }
-        .cell.called { background-color: #fee2e2; border-color: #ef4444; color: #b91c1c; }
-        .cell.marked { background-color: #ef4444; color: white; border-color: #b91c1c; position: relative; }
-        .cell.marked::after { content: '❌'; position: absolute; font-size: 0.8rem; top: 2px; right: 2px; }
-        .active-player { border-left: 4px solid #3b82f6; background-color: #eff6ff; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .bingo-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        .cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 12px; cursor: pointer; font-weight: 900; font-size: 1.5rem; transition: all 0.2s; background: #fff; box-shadow: inset 0 -4px 0 rgba(0,0,0,0.1); border: 2px solid #e2e8f0; }
+        .cell.marked { background: #ff4757; color: white; border-color: #ff4757; transform: translateY(2px); box-shadow: none; }
+        .cell.last-move { border: 4px solid #2f3542; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .countdown-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; color: white; font-size: 8rem; font-weight: 900; z-index: 100; pointer-events: none; }
     </style>
 </head>
-<body class="bg-slate-50 p-4">
+<body class="bg-yellow-400 min-h-screen p-4">
 
-    <div id="app" class="max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-xl">
-        <header class="text-center mb-6 border-b pb-4">
-            <h1 class="text-3xl font-black text-slate-800">BINGO ONLINE</h1>
-            <p class="text-slate-500 text-sm">Firebase Realtime 版</p>
+    <div id="app" class="max-w-2xl mx-auto bg-white p-6 rounded-3xl shadow-2xl border-4 border-black">
+        <header class="text-center mb-6">
+            <h1 class="text-5xl font-black italic tracking-tighter text-black">BINGO</h1>
+            <div id="user-info" class="text-sm font-bold text-gray-500 mt-2"></div>
         </header>
         
+        <div id="countdown" class="countdown-overlay hidden"></div>
+
         <div id="login-section" class="text-center py-10">
-            <button id="btn-login" class="bg-white border-2 border-slate-200 hover:border-slate-300 px-8 py-3 rounded-full font-bold flex items-center justify-center mx-auto transition-all shadow-sm">
-                <img src="https://www.google.com/favicon.ico" class="w-5 h-5 mr-2"> 使用 Google 帳號登入
+            <button id="btn-login" class="bg-black text-white px-10 py-4 rounded-2xl font-black text-xl hover:bg-gray-800 transition-all shadow-lg">
+                GOOGLE 登入開始玩
             </button>
         </div>
 
-        <div id="lobby-section" class="hidden">
-            <div class="bg-blue-50 p-4 rounded-xl mb-6 flex items-center justify-between">
-                <div id="user-info" class="font-medium text-blue-800"></div>
-                <button id="btn-logout" class="text-xs text-slate-400 underline">登出</button>
-            </div>
-            
-            <div class="space-y-4">
-                <button id="btn-create" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95">
-                    ＋ 創建新房間
-                </button>
-                <div class="relative py-4">
-                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
-                    <div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-slate-400">或加入現有房間</span></div>
-                </div>
-                <div class="flex gap-2">
-                    <input id="input-room-id" type="text" maxlength="8" placeholder="輸入 8 位房間代碼" class="flex-grow border-2 border-slate-200 p-4 rounded-xl focus:border-blue-500 outline-none text-center tracking-widest font-mono">
-                    <button id="btn-join" class="bg-slate-800 hover:bg-black text-white px-8 rounded-xl font-bold">加入</button>
-                </div>
+        <div id="lobby-section" class="hidden space-y-6">
+            <button id="btn-create" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-black py-6 rounded-2xl text-2xl shadow-[0_8px_0_rgb(37,99,235)] active:shadow-none active:translate-y-2 transition-all">
+                創 建 房 間
+            </button>
+            <div class="flex gap-3">
+                <input id="input-room-id" type="text" maxlength="8" placeholder="輸入8位代碼" class="flex-grow border-4 border-black p-4 rounded-2xl font-black text-center text-xl outline-none">
+                <button id="btn-join" class="bg-black text-white px-8 rounded-2xl font-black text-xl hover:bg-gray-800">加入</button>
             </div>
         </div>
 
         <div id="room-section" class="hidden">
-            <div class="flex justify-between items-start mb-6">
+            <div class="flex justify-between items-end mb-6">
                 <div>
-                    <h2 class="text-sm text-slate-400 uppercase font-bold tracking-widest">房間代碼</h2>
-                    <p class="text-2xl font-mono font-black text-blue-600" id="display-room-id"></p>
+                    <span class="bg-black text-white px-3 py-1 rounded-full text-xs font-black">ROOM CODE</span>
+                    <p class="text-3xl font-black text-black" id="display-room-id"></p>
                 </div>
-                <button id="btn-leave" class="bg-slate-100 text-slate-500 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-50 hover:text-red-500 transition-colors">離開</button>
+                <div class="text-right">
+                    <span class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-black">WIN GOAL</span>
+                    <p class="text-2xl font-black text-red-500" id="display-goal">--</p>
+                </div>
             </div>
 
-            <div id="host-controls" class="hidden bg-orange-50 border-2 border-orange-100 p-4 rounded-xl mb-6">
-                <div class="flex items-center justify-between mb-4">
-                    <span class="font-bold text-orange-800">⚙️ 房主設定</span>
-                    <div class="flex items-center gap-2">
-                        <label class="text-sm">連線目標：</label>
-                        <select id="select-goal" class="border rounded px-2 py-1">
+            <div id="host-controls" class="hidden bg-gray-100 p-4 rounded-2xl border-2 border-black mb-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black mb-1">連線幾條贏？</label>
+                        <select id="select-goal" class="w-full border-2 border-black p-2 rounded-xl font-bold">
                             <option value="1">1 條線</option>
                             <option value="3" selected>3 條線</option>
                             <option value="5">5 條線 (全滿)</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="block text-xs font-black mb-1">隱藏對方出牌？</label>
+                        <select id="select-fog" class="w-full border-2 border-black p-2 rounded-xl font-bold">
+                            <option value="false">公開 (一般)</option>
+                            <option value="true">隱藏 (刺激！)</option>
+                        </select>
+                    </div>
                 </div>
-                <button id="btn-start" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2 rounded-lg shadow-md">開始遊戲</button>
+                <button id="btn-start" class="w-full bg-green-500 text-white font-black py-3 rounded-xl border-b-4 border-green-700 hover:bg-green-600">開始倒數遊戲</button>
             </div>
 
-            <div id="turn-indicator" class="text-center py-2 px-4 rounded-full mb-4 font-bold transition-all">
-                等待遊戲開始...
+            <div id="turn-indicator" class="text-center py-4 rounded-2xl mb-6 font-black text-2xl border-4 border-black transition-all">
+                等待房主開始...
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div class="md:col-span-1">
-                    <h3 class="text-xs font-bold text-slate-400 mb-2">玩家列表 (最多 10 人)</h3>
-                    <div id="player-list" class="space-y-2 text-sm"></div>
-                </div>
-
-                <div class="md:col-span-2">
-                    <div id="game-board" class="bingo-grid pointer-events-none opacity-50">
-                        </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="md:col-span-1 space-y-2" id="player-list"></div>
+                <div class="md:col-span-3">
+                    <div id="game-board" class="bingo-grid pointer-events-none opacity-20"></div>
                 </div>
             </div>
+            
+            <button id="btn-leave" class="mt-8 w-full text-gray-400 font-bold hover:text-red-500">離開房間</button>
         </div>
     </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
     import { getDatabase, ref, set, get, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // 這裡請替換成你的 Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyBdt75NPrgmYs0rw1KQv_sRfYdFwQimo1c",
         authDomain: "bingo-f3e9d.firebaseapp.com",
@@ -116,202 +113,190 @@
     let currentRoomId = null;
     let myBoard = [];
     let isGameOver = false;
+    let localMarked = []; // 用於隱藏模式
 
-    // --- 初始化 ---
+    // --- 介面控制 ---
+    function showSection(id) {
+        ['login-section', 'lobby-section', 'room-section'].forEach(s => document.getElementById(s).classList.toggle('hidden', s !== id));
+    }
+
     onAuthStateChanged(auth, user => {
-        if (user) {
-            currentUser = user;
-            document.getElementById('user-info').innerText = `👋 您好, ${user.displayName}`;
-            showSection('lobby-section');
-        } else {
-            showSection('login-section');
-        }
+        if (user) { currentUser = user; document.getElementById('user-info').innerText = user.displayName; showSection('lobby-section'); }
+        else { showSection('login-section'); }
     });
 
     document.getElementById('btn-login').onclick = () => signInWithPopup(auth, provider);
-    document.getElementById('btn-logout').onclick = () => signOut(auth);
 
-    // --- 房間管理 ---
-    async function createRoom() {
-        const roomId = Math.random().toString().slice(2, 10);
-        const roomRef = ref(db, `rooms/${roomId}`);
-        await set(roomRef, {
+    // --- 房間邏輯 ---
+    document.getElementById('btn-create').onclick = async () => {
+        const id = Math.random().toString().slice(2, 10);
+        await set(ref(db, `rooms/${id}`), {
             host: currentUser.uid,
             status: 'waiting',
-            settings: { goal: 3 },
+            settings: { goal: 3, fogOfWar: false },
             calledNumbers: [0],
             turnIndex: 0,
             playerOrder: [currentUser.uid],
-            players: {
-                [currentUser.uid]: { name: currentUser.displayName, ready: true }
-            }
+            players: { [currentUser.uid]: { name: currentUser.displayName } }
         });
-        joinRoom(roomId);
-    }
+        joinRoom(id);
+    };
+
+    document.getElementById('btn-join').onclick = () => joinRoom(document.getElementById('input-room-id').value);
 
     async function joinRoom(roomId) {
-        const roomRef = ref(db, `rooms/${roomId}`);
-        const snap = await get(roomRef);
-        if (!snap.exists()) return alert("找不到此房間！");
-        if (Object.keys(snap.val().players || {}).length >= 10) return alert("房間已滿！");
+        const snap = await get(ref(db, `rooms/${roomId}`));
+        if (!snap.exists()) return alert("房間不存在");
+        const data = snap.val();
+        if (Object.keys(data.players).length >= 10) return alert("房間滿了");
 
-        await update(ref(db, `rooms/${roomId}/players/${currentUser.uid}`), {
-            name: currentUser.displayName
-        });
-
-        // 更新出牌順序清單 (若不在清單中則加入)
-        const order = snap.val().playerOrder || [];
-        if (!order.includes(currentUser.uid)) {
-            order.push(currentUser.uid);
-            await update(roomRef, { playerOrder: order });
+        await update(ref(db, `rooms/${roomId}/players/${currentUser.uid}`), { name: currentUser.displayName });
+        if (!data.playerOrder.includes(currentUser.uid)) {
+            const newOrder = [...data.playerOrder, currentUser.uid];
+            await update(ref(db, `rooms/${roomId}`), { playerOrder: newOrder });
         }
 
         currentRoomId = roomId;
-        myBoard = []; // 清空舊盤面
-        isGameOver = false;
+        myBoard = []; isGameOver = false; localMarked = [];
         showSection('room-section');
         document.getElementById('display-room-id').innerText = roomId;
-        listenToRoom(roomId);
+        listenRoom(roomId);
     }
 
-    function listenToRoom(roomId) {
+    function listenRoom(roomId) {
         onValue(ref(db, `rooms/${roomId}`), snap => {
             const data = snap.val();
-            if (!data) return (location.reload());
+            if (!data) return;
 
-            // 1. 踢人檢查
-            if (!data.players[currentUser.uid]) {
-                alert("你已被踢出房間");
-                location.reload();
-                return;
-            }
+            if (!data.players[currentUser.uid]) return location.reload();
 
-            // 2. 介面更新
             const isHost = data.host === currentUser.uid;
             document.getElementById('host-controls').classList.toggle('hidden', !isHost || data.status !== 'waiting');
-            
-            // 3. 玩家列表與輪流顯示
-            const activeUid = data.playerOrder[data.turnIndex];
-            const pList = document.getElementById('player-list');
-            pList.innerHTML = data.playerOrder.map(uid => {
-                const p = data.players[uid];
-                if (!p) return '';
-                const isActive = uid === activeUid && data.status === 'playing';
-                return `
-                    <div class="flex items-center justify-between p-2 rounded-lg ${isActive ? 'active-player shadow-sm' : ''}">
-                        <span class="${isActive ? 'font-bold text-blue-600' : ''}">${p.name} ${uid === data.host ? '👑' : ''}</span>
-                        ${isHost && uid !== currentUser.uid ? `<button onclick="kick('${uid}')" class="text-xs text-red-300">踢除</button>` : ''}
-                    </div>
-                `;
+            document.getElementById('display-goal').innerText = `${data.settings.goal} 線`;
+
+            // 渲染玩家列表
+            document.getElementById('player-list').innerHTML = data.playerOrder.map(uid => {
+                const isActive = data.playerOrder[data.turnIndex] === uid && data.status === 'playing';
+                return `<div class="p-2 rounded-xl border-2 ${isActive ? 'bg-black text-white border-black' : 'bg-white border-gray-200'} text-sm font-black flex justify-between">
+                    <span>${data.players[uid].name}</span>
+                    ${isHost && uid !== currentUser.uid ? `<button onclick="kickPlayer('${uid}')" class="text-red-500 text-xs">踢</button>` : ''}
+                </div>`;
             }).join('');
 
-            // 4. 遊戲狀態邏輯
-            const indicator = document.getElementById('turn-indicator');
+            // 處理倒數
+            if (data.status === 'counting' && document.getElementById('countdown').classList.contains('hidden')) {
+                startCountdownAction();
+            }
+
+            // 處理遊戲盤面
             if (data.status === 'playing') {
-                document.getElementById('game-board').classList.remove('pointer-events-none', 'opacity-50');
                 if (myBoard.length === 0) generateBoard();
+                document.getElementById('game-board').classList.remove('pointer-events-none', 'opacity-20');
+                const isMyTurn = data.playerOrder[data.turnIndex] === currentUser.uid;
+                const indicator = document.getElementById('turn-indicator');
+                indicator.innerText = isMyTurn ? "🔥 輪到你出牌！" : "💤 等待對手...";
+                indicator.className = `text-center py-4 rounded-2xl mb-6 font-black text-2xl border-4 border-black transition-all ${isMyTurn ? 'bg-yellow-400' : 'bg-gray-100 text-gray-400'}`;
                 
-                if (currentUser.uid === activeUid) {
-                    indicator.innerText = "⭐ 現在輪到你出牌！";
-                    indicator.className = "text-center py-2 bg-blue-500 text-white rounded-full mb-4 animate-pulse";
-                } else {
-                    indicator.innerText = `等待 ${data.players[activeUid]?.name || '對方'} 出牌...`;
-                    indicator.className = "text-center py-2 bg-slate-100 text-slate-500 rounded-full mb-4";
-                }
-                renderBoard(data.calledNumbers);
-                checkWin(data.calledNumbers, data.settings.goal, data.players);
-            } else if (data.status === 'ended') {
-                indicator.innerText = `🎉 遊戲結束！贏家：${data.winnerName}`;
-                indicator.className = "text-center py-2 bg-green-500 text-white rounded-full mb-4";
+                renderBoard(data.calledNumbers, data.settings.fogOfWar, data.lastMove);
+                checkWin(data.calledNumbers, data.settings.goal);
+            }
+
+            if (data.status === 'ended') {
+                document.getElementById('turn-indicator').innerText = `🏆 贏家：${data.winnerName}`;
+                document.getElementById('turn-indicator').classList.add('bg-green-500', 'text-white');
                 document.getElementById('game-board').classList.add('pointer-events-none');
             }
         });
     }
 
-    // --- 賓果核心邏輯 ---
+    function startCountdownAction() {
+        const el = document.getElementById('countdown');
+        el.classList.remove('hidden');
+        let count = 3;
+        const timer = setInterval(() => {
+            el.innerText = count > 0 ? count : "GO!";
+            if (count < 0) {
+                clearInterval(timer);
+                el.classList.add('hidden');
+                el.innerText = "";
+            }
+            count--;
+        }, 800);
+    }
+
     function generateBoard() {
         myBoard = Array.from({length: 25}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
     }
 
-    function renderBoard(calledNumbers) {
+    function renderBoard(calledNumbers, fogOfWar, lastMove) {
         const container = document.getElementById('game-board');
         container.innerHTML = '';
         myBoard.forEach(num => {
             const isCalled = calledNumbers.includes(num);
             const div = document.createElement('div');
-            div.className = `cell ${isCalled ? 'marked' : ''}`;
+            // 隱藏模式邏輯：只有我自己點過的，或是被叫到且非隱藏模式才變紅
+            const shouldShowMark = fogOfWar ? (localMarked.includes(num)) : isCalled;
+            
+            div.className = `cell ${shouldShowMark ? 'marked' : ''} ${lastMove === num && !fogOfWar ? 'last-move' : ''}`;
             div.innerText = num;
-            div.onclick = () => handleCellClick(num, calledNumbers);
+            div.onclick = () => handleMove(num, calledNumbers);
             container.appendChild(div);
         });
     }
 
-    async function handleCellClick(num, calledNumbers) {
+    async function handleMove(num, calledNumbers) {
         if (isGameOver) return;
-        const roomSnap = await get(ref(db, `rooms/${currentRoomId}`));
-        const data = roomSnap.val();
-        
-        // 檢查是否輪到我
-        if (data.playerOrder[data.turnIndex] !== currentUser.uid) return alert("還沒輪到你！");
+        const snap = await get(ref(db, `rooms/${currentRoomId}`));
+        const data = snap.val();
+        if (data.playerOrder[data.turnIndex] !== currentUser.uid) return;
         if (calledNumbers.includes(num)) return;
 
-        const nextIndex = (data.turnIndex + 1) % data.playerOrder.length;
-        
+        localMarked.push(num); // 自己點的數字一定要標記
+        const nextIdx = (data.turnIndex + 1) % data.playerOrder.length;
         await update(ref(db, `rooms/${currentRoomId}`), {
             calledNumbers: [...calledNumbers, num],
-            turnIndex: nextIndex
+            turnIndex: nextIdx,
+            lastMove: num
         });
     }
 
-    function checkWin(calledNumbers, goal, players) {
+    function checkWin(calledNumbers, goal) {
         if (isGameOver) return;
         let lines = 0;
-        const size = 5;
-        
-        // 建立布林矩陣
         const matrix = [];
-        for (let i = 0; i < size; i++) {
-            matrix[i] = myBoard.slice(i * size, i * size + size).map(n => calledNumbers.includes(n));
+        for (let i = 0; i < 5; i++) {
+            matrix[i] = myBoard.slice(i*5, i*5+5).map(n => calledNumbers.includes(n));
         }
-
-        // 檢查橫線、豎線
-        for (let i = 0; i < size; i++) {
-            if (matrix[i].every(v => v)) lines++; // 橫
-            if (matrix.map(row => row[i]).every(v => v)) lines++; // 豎
+        for (let i = 0; i < 5; i++) {
+            if (matrix[i].every(v => v)) lines++;
+            if (matrix.map(r => r[i]).every(v => v)) lines++;
         }
-        // 檢查斜線
         if ([0,1,2,3,4].every(i => matrix[i][i])) lines++;
         if ([0,1,2,3,4].every(i => matrix[i][4-i])) lines++;
 
         if (lines >= goal) {
             isGameOver = true;
-            update(ref(db, `rooms/${currentRoomId}`), {
-                status: 'ended',
-                winnerName: currentUser.displayName
-            });
+            update(ref(db, `rooms/${currentRoomId}`), { status: 'ended', winnerName: currentUser.displayName });
         }
     }
 
-    // --- 輔助功能 ---
-    window.kick = (uid) => {
-        remove(ref(db, `rooms/${currentRoomId}/players/${uid}`));
+    // --- 事件綁定 ---
+    document.getElementById('btn-start').onclick = async () => {
+        await update(ref(db, `rooms/${currentRoomId}`), { 
+            status: 'counting',
+            settings: { 
+                goal: parseInt(document.getElementById('select-goal').value),
+                fogOfWar: document.getElementById('select-fog').value === 'true'
+            }
+        });
+        setTimeout(() => {
+            update(ref(db, `rooms/${currentRoomId}`), { status: 'playing' });
+        }, 3500);
     };
 
-    document.getElementById('btn-create').onclick = createRoom;
-    document.getElementById('btn-join').onclick = () => joinRoom(document.getElementById('input-room-id').value);
+    window.kickPlayer = (uid) => remove(ref(db, `rooms/${currentRoomId}/players/${uid}`));
     document.getElementById('btn-leave').onclick = () => location.reload();
-    document.getElementById('btn-start').onclick = () => {
-        update(ref(db, `rooms/${currentRoomId}`), {
-            status: 'playing',
-            settings: { goal: parseInt(document.getElementById('select-goal').value) }
-        });
-    };
 
-    function showSection(id) {
-        ['login-section', 'lobby-section', 'room-section'].forEach(s => {
-            document.getElementById(s).classList.toggle('hidden', s !== id);
-        });
-    }
 </script>
 </body>
 </html>
